@@ -1,0 +1,67 @@
+# Hand-maintained additions. Format: word ranking_weight 0 pinyin_per_character
+# Weights are editorial ranking choices, not measured corpus frequencies.
+大模型 6000 0 da mo xing
+大语言模型 4500 0 da yu yan mo xing
+语言模型 4500 0 yu yan mo xing
+多模态 4000 0 duo mo tai
+端到端 4000 0 duan dao duan
+生成式 3000 0 sheng cheng shi
+生成式模型 2500 0 sheng cheng shi mo xing
+自动驾驶 5000 0 zi dong jia shi
+辅助驾驶 2500 0 fu zhu jia shi
+深度学习 5000 0 shen du xue xi
+机器学习 5000 0 ji qi xue xi
+人工智能 8000 0 ren gong zhi neng
+神经网络 4000 0 shen jing wang luo
+强化学习 3000 0 qiang hua xue xi
+模仿学习 2500 0 mo fang xue xi
+监督学习 2500 0 jian du xue xi
+自监督 2000 0 zi jian du
+预训练 3000 0 yu xun lian
+微调 3000 0 wei tiao
+蒸馏 1500 0 zheng liu
+提示词 3000 0 ti shi ci
+上下文窗口 2000 0 shang xia wen chuang kou
+向量数据库 2000 0 xiang liang shu ju ku
+数据集 4000 0 shu ju ji
+训练集 3000 0 xun lian ji
+验证集 3000 0 yan zheng ji
+测试集 3000 0 ce shi ji
+损失函数 3000 0 sun shi han shu
+学习率 3000 0 xue xi lv
+批大小 1500 0 pi da xiao
+检查点 2000 0 jian cha dian
+过拟合 2500 0 guo ni he
+欠拟合 1500 0 qian ni he
+张量 2500 0 zhang liang
+显存 3000 0 xian cun
+算力 3000 0 suan li
+推理服务 2000 0 tui li fu wu
+语音识别 4000 0 yu yin shi bie
+语音输入法 3000 0 yu yin shu ru fa
+实时转写 2000 0 shi shi zhuan xie
+目标检测 3000 0 mu biao jian ce
+语义分割 2500 0 yu yi fen ge
+车道线 2500 0 che dao xian
+占用网络 1500 0 zhan yong wang luo
+点云 2500 0 dian yun
+传感器融合 2000 0 chuan gan qi rong he
+微信 8000 0 wei xin
+微信号 2000 0 wei xin hao
+小程序 3500 0 xiao cheng xu
+二维码 4000 0 er wei ma
+扫码 2500 0 sao ma
+支付宝 3500 0 zhi fu bao
+移动支付 2500 0 yi dong zhi fu
+网约车 2500 0 wang yue che
+短视频 3500 0 duan shi pin
+视频会议 3000 0 shi pin hui yi
+云盘 2000 0 yun pan
+网盘 2500 0 wang pan
+云计算 3000 0 yun ji suan
+容器化 2000 0 rong qi hua
+开源项目 2500 0 kai yuan xiang mu
+代码仓库 2500 0 dai ma cang ku
+版本管理 2000 0 ban ben guan li
+持续集成 2000 0 chi xu ji cheng
+单元测试 2500 0 dan yuan ce shi

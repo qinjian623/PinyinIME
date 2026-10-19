@@ -416,11 +416,6 @@ size_t DictBuilder::read_raw_dict(const char* fn_raw,
       continue;
     }
 
-    if (lemma_size > 4) {
-      i--;
-      continue;
-    }
-
     // Copy to the lemma entry
     utf16_strcpy(lemma_arr_[i].hanzi_str, token);
 

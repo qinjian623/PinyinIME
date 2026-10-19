@@ -28,6 +28,10 @@ using namespace ime_pinyin;
  * in dictdef.h.
  */
 int main(int argc, char* argv[]) {
+  if (argc != 1 && argc != 3 && argc != 4) {
+    fprintf(stderr, "Usage: %s [source valid_characters [output]]\n", argv[0]);
+    return 2;
+  }
   DictTrie* dict_trie = new DictTrie();
   bool success;
   if (argc >= 3)
@@ -43,7 +47,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  success = dict_trie->save_dict("../../res/raw/dict_pinyin.dat");
+  success = dict_trie->save_dict(argc == 4 ? argv[3] : "../../res/raw/dict_pinyin.dat");
 
   if (success) {
     printf("Save dictionary successfully.\n");

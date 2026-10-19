@@ -28,6 +28,12 @@ namespace ime_pinyin {
 
 static const size_t kMaxRowNum = kMaxSearchSteps;
 
+struct CorrectionCandidate {
+  char spelling[kMaxSearchSteps];
+  char16 text[kMaxLemmaSize + 1];
+  LmaScoreType score;
+};
+
 typedef struct {
   // MileStoneHandle objects for the system and user dictionaries.
   MileStoneHandle dict_handles[2];
@@ -292,6 +298,10 @@ class MatrixSearch {
 
   uint16 get_lemma_str(LemmaIdType id_lemma, char16 *str_buf, uint16 str_max);
 
+  size_t get_word_lpis(const char *spelling, LmaPsbItem *items, size_t capacity);
+  void add_correction(const char *spelling, CorrectionCandidate *results,
+                      size_t *count, size_t capacity);
+
   uint16 get_lemma_splids(LemmaIdType id_lemma, uint16 *splids,
                           uint16 splids_max, bool arg_valid);
 
@@ -416,6 +426,9 @@ class MatrixSearch {
 
   // Get the number of candiates, called after search().
   size_t get_candidate_num();
+
+  // Suggestions for a whole word; does not change the active composition.
+  size_t get_corrections(CorrectionCandidate *results, size_t capacity);
 
   // Get the Pinyin string stored by the engine.
   // *decoded_len returns the length of the successfully decoded string.

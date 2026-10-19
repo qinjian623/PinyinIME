@@ -3,8 +3,14 @@
 #include <cstring>
 #include <random>
 #include <string>
+#include <chrono>
+#include <codecvt>
+#include <fstream>
+#include <locale>
+#include <sstream>
 
 #include "dicttrie.h"
+#include "matrixsearch.h"
 #include "pinyinime.h"
 #include "splparser.h"
 #include "spellingtrie.h"
@@ -167,14 +173,146 @@ static void editing() {
   }
 }
 
+static void vocabulary(const char* additions) {
+  const char* inputs[] = {"damoxing", "dayuyanmoxing", "duomotai", "duandaoduan",
+                         "shengchengshi", "weixin", "erweima", "yuyinshurufa",
+                         "shenduxuexi", "zidongjiashi", "xuexilv", "xiancun"};
+  const char16_t* expected[] = {u"大模型", u"大语言模型", u"多模态", u"端到端",
+                               u"生成式", u"微信", u"二维码", u"语音输入法",
+                               u"深度学习", u"自动驾驶", u"学习率", u"显存"};
+  for (size_t i = 0; i < 12; ++i) {
+    im_reset_search();
+    CHECK(im_search(inputs[i], std::strlen(inputs[i])) > 0);
+    if (candidate(0) != expected[i]) std::fprintf(stderr, "Vocabulary: %s\n", inputs[i]);
+    CHECK(candidate(0) == expected[i]);
+  }
+  std::ifstream source(additions);
+  CHECK(source.good());
+  std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf8;
+  std::string line;
+  size_t checked = 0;
+  while (std::getline(source, line)) {
+    std::istringstream fields(line);
+    std::string word, weight, flag, syllable, spelling;
+    if (!(fields >> word) || word[0] == '#') continue;
+    CHECK(bool(fields >> weight >> flag));
+    while (fields >> syllable) spelling += syllable;
+    im_reset_search();
+    size_t count = im_search(spelling.c_str(), spelling.size());
+    const std::u16string text = utf8.from_bytes(word);
+    bool found = false;
+    for (size_t i = 0; i < count; ++i) {
+      if (candidate(i) != text) continue;
+      CHECK(im_choose(i) == 1);
+      CHECK(candidate(0) == text);
+      CHECK(im_get_fixed_len() == text.size());
+      found = true;
+      break;
+    }
+    if (!found) std::fprintf(stderr, "Missing dictionary entry: %s\n", word.c_str());
+    CHECK(found);
+    checked++;
+  }
+  CHECK(checked > 0);
+  std::printf("Dictionary entries selected: %zu\n", checked);
+}
+
+static void corrections_test(const char* dictionary) {
+  MatrixSearch literal;
+  CHECK(literal.init(dictionary, ""));
+  const char* inputs[] = {"zhongugo", "shurua", "shurufaa", "duomtoai", "damoxign", "duandaodaun"};
+  const char16_t* expected[] = {u"中国", u"输入法", u"输入法", u"多模态", u"大模型", u"端到端"};
+  for (size_t t = 0; t < 6; ++t) {
+    im_reset_search();
+    literal.reset_search();
+    literal.search(inputs[t], std::strlen(inputs[t]));
+    char16 first[64] = {};
+    CHECK(literal.get_candidate(0, first, 64));
+    size_t count = im_search(inputs[t], std::strlen(inputs[t]));
+    size_t added = count - literal.get_candidate_num();
+    CHECK(added <= 3);
+    std::u16string original;
+    for (size_t i = 0; first[i]; ++i) original.push_back(first[i]);
+    CHECK(candidate(0) == original);
+    // Inserting suggestions must preserve every original candidate index.
+    for (size_t i = 1; i < literal.get_candidate_num(); ++i) {
+      char16 text[64] = {};
+      CHECK(literal.get_candidate(i, text, 64));
+      std::u16string expected_text;
+      for (size_t j = 0; text[j]; ++j) expected_text.push_back(text[j]);
+      CHECK(candidate(i + added) == expected_text);
+    }
+    size_t choice = 0;
+    for (size_t i = 1; i < count && i <= 3; ++i)
+      if (candidate(i) == expected[t]) { choice = i; break; }
+    if (!choice) std::fprintf(stderr, "Missing correction: %s\n", inputs[t]);
+    CHECK(choice != 0);
+    size_t decoded = 0;
+    CHECK(std::string(im_get_sps_str(&decoded)) == inputs[t]);
+    CHECK(im_get_fixed_len() == 0);
+    char16 short_buffer[1] = {123};
+    CHECK(im_get_candidate(choice, short_buffer, 1) == NULL);
+    CHECK(short_buffer[0] == 123);
+    CHECK(im_choose(choice) == 1);
+    CHECK(candidate(0) == expected[t]);
+    const uint16* splits = NULL;
+    CHECK(im_get_spl_start_pos(splits) == candidate(0).size());
+    CHECK(im_get_fixed_len() == candidate(0).size());
+    const char* spelling = im_get_sps_str(&decoded);
+    CHECK(splits[candidate(0).size()] == std::strlen(spelling));
+    CHECK(decoded == std::strlen(spelling));
+    CHECK(im_cancel_last_choice() > 0);
+    CHECK(std::string(im_get_sps_str(&decoded)) == inputs[t]);
+    CHECK(im_get_fixed_len() == 0);
+    im_delsearch(std::strlen(inputs[t]) - 1, false, false);
+    CHECK(std::string(im_get_sps_str(&decoded)) == std::string(inputs[t]).substr(0, std::strlen(inputs[t]) - 1));
+  }
+
+  const char* unchanged[] = {"nihao", "zhongguo", "xuexi", "shiyong", "damoxing", "xi'an", "zg", "zz"};
+  for (const char* input : unchanged) {
+    literal.reset_search();
+    literal.search(input, std::strlen(input));
+    im_reset_search();
+    CHECK(im_search(input, std::strlen(input)) == literal.get_candidate_num());
+  }
+  im_reset_search();
+  size_t count = im_search("zhongugo", 8);
+  literal.reset_search();
+  literal.search("zhongugo", 8);
+  size_t added = count - literal.get_candidate_num();
+  CHECK(added > 0);
+  CHECK(im_choose(added + 1) == literal.choose(1));
+  CHECK(im_get_fixed_len() == literal.get_fixedlen());
+  CHECK(im_get_fixed_len() > 0);
+  CHECK(im_cancel_last_choice() > 0);
+  CHECK(im_get_fixed_len() == 0);
+  count = im_search("zhongugo", 8);
+  char16 text[64];
+  CHECK(im_get_candidate(count, text, 64) == NULL);
+  CHECK(im_choose(count) == count);
+  im_reset_search();
+  CHECK(im_get_candidate(1, text, 64) == NULL);
+
+  auto start = std::chrono::steady_clock::now();
+  for (size_t i = 0; i < 200; ++i) {
+    im_reset_search();
+    const char* input = inputs[i % 6];
+    im_search(input, std::strlen(input));
+  }
+  double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+  std::printf("Correction search: %.3f ms average (200 host queries)\n", elapsed / 200);
+}
+
 int main(int argc, char** argv) {
-  CHECK(argc == 2 || argc == 3);
-  const std::string test = argc == 3 ? argv[2] : "all";
+  CHECK(argc == 4);
+  const std::string test = argv[2];
   CHECK(test == "all" || test == "candidates" || test == "unmatched" ||
-        test == "capacity" || test == "editing");
+        test == "capacity" || test == "editing" || test == "vocabulary" || test == "corrections");
   CHECK(im_open_decoder(argv[1], ""));
   if (test == "all" || test == "candidates") candidates();
   if (test == "all" || test == "unmatched") unmatched();
+  if (test == "all" || test == "vocabulary") vocabulary(argv[3]);
+  if (test == "all" || test == "corrections") corrections_test(argv[1]);
   if (test == "all" || test == "editing") editing();
   im_close_decoder();
   if (test == "all" || test == "capacity") capacity(argv[1]);

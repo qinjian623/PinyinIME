@@ -1773,6 +1773,90 @@ size_t MatrixSearch::get_lpis(const uint16* splid_str, size_t splid_str_len,
   return num;
 }
 
+size_t MatrixSearch::get_word_lpis(const char *spelling, LmaPsbItem *items,
+                                  size_t capacity) {
+  size_t length = strlen(spelling);
+  if (length == 0 || length > max_sps_len_ || capacity == 0)
+    return 0;
+  uint16 ids[kMaxLemmaSize];
+  uint16 starts[kMaxLemmaSize + 1];
+  bool prefix = false;
+  uint16 count = spl_parser_->splstr_to_idxs_f(spelling, length, ids, starts,
+                                               kMaxLemmaSize, prefix);
+  if (count < 2 || count > max_hzs_len_ || starts[count] != length)
+    return 0;
+  for (uint16 i = 0; i < count; i++)
+    if (spl_trie_->is_half_id(ids[i])) return 0;
+  return dict_trie_->get_lpis(ids, count, items, capacity);
+}
+
+void MatrixSearch::add_correction(const char *spelling,
+                                  CorrectionCandidate *results,
+                                  size_t *count, size_t capacity) {
+  LmaPsbItem items[64];
+  size_t found = get_word_lpis(spelling, items, 64);
+  char16 original[kMaxRowNum] = {0};
+  if (found) get_candidate(0, original, kMaxRowNum);
+  for (size_t i = 0; i < found; i++) {
+    CorrectionCandidate item;
+    if (!get_lemma_str(items[i].id, item.text, kMaxLemmaSize + 1) ||
+        utf16_strcmp(item.text, original) == 0) continue;
+    item.score = items[i].psb;
+    strcpy(item.spelling, spelling);
+    size_t duplicate = 0;
+    while (duplicate < *count &&
+           utf16_strcmp(item.text, results[duplicate].text) != 0) duplicate++;
+    if (duplicate < *count) {
+      if (results[duplicate].score <= item.score) continue;
+      for (size_t j = duplicate + 1; j < *count; j++) results[j - 1] = results[j];
+      (*count)--;
+    }
+    size_t position = 0;
+    while (position < *count && results[position].score <= item.score) position++;
+    if (position >= capacity) continue;
+    if (*count < capacity) (*count)++;
+    for (size_t j = *count - 1; j > position; j--) results[j] = results[j - 1];
+    results[position] = item;
+  }
+}
+
+size_t MatrixSearch::get_corrections(CorrectionCandidate *results,
+                                     size_t capacity) {
+  if (!inited_ || fixed_hzs_ || !results || !capacity || !get_candidate_num())
+    return 0;
+  size_t length = strlen(pys_);
+  if (length < 4 || length >= kMaxRowNum - 1) return 0;
+  for (size_t i = 0; i < length; i++)
+    if (pys_[i] < 'a' || pys_[i] > 'z') return 0;
+  LmaPsbItem exact;
+  if (get_word_lpis(pys_, &exact, 1)) return 0;
+
+  // shortcut: Suggest one edit to a whole word; sentence correction needs its own ranking tests.
+  size_t count = 0;
+  char edited[kMaxRowNum];
+  for (size_t i = 0; i + 1 < length; i++) {
+    if (pys_[i] == pys_[i + 1]) continue;
+    strcpy(edited, pys_);
+    edited[i] = pys_[i + 1];
+    edited[i + 1] = pys_[i];
+    add_correction(edited, results, &count, capacity);
+  }
+  for (size_t i = 0; i < length; i++) {
+    memcpy(edited, pys_, i);
+    strcpy(edited + i, pys_ + i + 1);
+    add_correction(edited, results, &count, capacity);
+  }
+  for (size_t i = 0; i <= length; i++) {
+    memcpy(edited, pys_, i);
+    strcpy(edited + i + 1, pys_ + i);
+    for (char letter = 'a'; letter <= 'z'; letter++) {
+      edited[i] = letter;
+      add_correction(edited, results, &count, capacity);
+    }
+  }
+  return count;
+}
+
 uint16 MatrixSearch::get_lemma_str(LemmaIdType id_lemma, char16 *str_buf,
                                    uint16 str_max) {
   uint16 str_len = 0;

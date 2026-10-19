@@ -155,6 +155,8 @@ extern "C" {
    * first unfixed position. If the candidate matches the end of the all
    * spelling ids, there will be only one new candidates, or the whole fixed
    * sentence.
+   * Selecting a typo suggestion also updates the spelling string; callers
+   * should re-read it and its segmentation before continuing to edit.
    *
    * @param cand_id The id of candidate to select and make it fixed.
    * @return The number of candidates. If after the selection, the whole result

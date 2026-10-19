@@ -15,4 +15,5 @@ if [[ -n "${CXXFLAGS:-}" ]]; then read -r -a extra_flags <<< "$CXXFLAGS"; fi
 
 # The original decoder retains process-wide singleton caches.
 ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 \
-  "$build_dir/native_decoder_test" "$repo_dir/res/raw/dict_pinyin.dat" "$@"
+  "$build_dir/native_decoder_test" "$repo_dir/res/raw/dict_pinyin.dat" \
+  "${1:-all}" "$repo_dir/jni/data/extra_words.txt"

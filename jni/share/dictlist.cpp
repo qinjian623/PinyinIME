@@ -138,8 +138,8 @@ size_t DictList::calculate_size(const LemmaEntry* lemma_arr, size_t lemma_num) {
           id_num++;
       } else {
         for (size_t len = last_hz_len; len < current_hz_len - 1; len++) {
-          start_pos_[len] = start_pos_[len - 1];
-          start_id_[len] = start_id_[len - 1];
+          start_pos_[len] = list_size;
+          start_id_[len] = id_num + 1;
         }
 
         start_pos_[current_hz_len - 1] = list_size;
@@ -159,7 +159,7 @@ size_t DictList::calculate_size(const LemmaEntry* lemma_arr, size_t lemma_num) {
       start_id_[0] = 1;
     } else {
       start_pos_[i] = list_size;
-      start_id_[i] = id_num;
+      start_id_[i] = id_num + 1;
     }
   }
 
@@ -194,7 +194,7 @@ void DictList::fill_list(const LemmaEntry* lemma_arr, size_t lemma_num) {
   }
 
   assert(current_pos == start_pos_[kMaxLemmaSize]);
-  assert(id_num == start_id_[kMaxLemmaSize]);
+  assert(id_num + 1 == start_id_[kMaxLemmaSize]);
 }
 
 char16* DictList::find_pos2_startedbyhz(char16 hz_char) {
@@ -384,14 +384,14 @@ bool DictList::save_list(FILE *fp) {
       NULL == scis_hz_ || NULL == scis_splid_ || 0 == scis_num_)
     return false;
 
-  if (fwrite(&scis_num_, sizeof(size_t), 1, fp) != 1)
+  if (fwrite(&scis_num_, sizeof(uint32), 1, fp) != 1)
     return false;
 
-  if (fwrite(start_pos_, sizeof(size_t), kMaxLemmaSize + 1, fp) !=
+  if (fwrite(start_pos_, sizeof(uint32), kMaxLemmaSize + 1, fp) !=
       kMaxLemmaSize + 1)
     return false;
 
-  if (fwrite(start_id_, sizeof(size_t), kMaxLemmaSize + 1, fp) !=
+  if (fwrite(start_id_, sizeof(uint32), kMaxLemmaSize + 1, fp) !=
       kMaxLemmaSize + 1)
     return false;
 

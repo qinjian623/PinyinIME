@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include "../include/pinyinime.h"
 #include "../include/dicttrie.h"
 #include "../include/matrixsearch.h"
@@ -32,9 +33,21 @@ extern "C" {
   // Used to search Pinyin string and give the best candidate.
   MatrixSearch* matrix_search = NULL;
 
+  static const size_t kMaxCorrections = 3;
+  static CorrectionCandidate corrections[kMaxCorrections];
+  static size_t correction_count = 0;
+  static char correction_original[kMaxSearchSteps] = {0};
+
+  static size_t refresh_corrections() {
+    correction_count = matrix_search->get_corrections(corrections, kMaxCorrections);
+    return matrix_search->get_candidate_num() + correction_count;
+  }
+
   char16 predict_buf[kMaxPredictNum][kMaxPredictSize + 1];
 
   bool im_open_decoder(const char *fn_sys_dict, const char *fn_usr_dict) {
+    correction_count = 0;
+    correction_original[0] = '\0';
     if (NULL != matrix_search)
       delete matrix_search;
 
@@ -48,6 +61,8 @@ extern "C" {
 
   bool im_open_decoder_fd(int sys_fd, long start_offset, long length,
                           const char *fn_usr_dict) {
+    correction_count = 0;
+    correction_original[0] = '\0';
     if (NULL != matrix_search)
       delete matrix_search;
 
@@ -59,6 +74,8 @@ extern "C" {
   }
 
   void im_close_decoder() {
+    correction_count = 0;
+    correction_original[0] = '\0';
     if (NULL != matrix_search) {
       matrix_search->close();
       delete matrix_search;
@@ -82,19 +99,25 @@ extern "C" {
     if (NULL == matrix_search)
       return 0;
 
+    correction_count = 0;
+    correction_original[0] = '\0';
     matrix_search->search(pybuf, pylen);
-    return matrix_search->get_candidate_num();
+    return refresh_corrections();
   }
 
   size_t im_delsearch(size_t pos, bool is_pos_in_splid,
                       bool clear_fixed_this_step) {
     if (NULL == matrix_search)
       return 0;
+    correction_count = 0;
+    correction_original[0] = '\0';
     matrix_search->delsearch(pos, is_pos_in_splid, clear_fixed_this_step);
-    return matrix_search->get_candidate_num();
+    return refresh_corrections();
   }
 
   void im_reset_search() {
+    correction_count = 0;
+    correction_original[0] = '\0';
     if (NULL == matrix_search)
       return;
 
@@ -115,8 +138,19 @@ extern "C" {
 
   char16* im_get_candidate(size_t cand_id, char16* cand_str,
                         size_t max_len) {
-    if (NULL == matrix_search)
+    if (NULL == matrix_search || NULL == cand_str || max_len == 0)
       return NULL;
+    if (cand_id >= matrix_search->get_candidate_num() + correction_count)
+      return NULL;
+
+    if (cand_id > 0 && cand_id <= correction_count) {
+      const char16 *text = corrections[cand_id - 1].text;
+      size_t length = utf16_strlen(text);
+      if (length >= max_len) return NULL;
+      memcpy(cand_str, text, (length + 1) * sizeof(char16));
+      return cand_str;
+    }
+    if (cand_id > correction_count) cand_id -= correction_count;
 
     return matrix_search->get_candidate(cand_id, cand_str, max_len);
   }
@@ -132,6 +166,31 @@ extern "C" {
     if (NULL == matrix_search)
       return 0;
 
+    if (choice_id >= matrix_search->get_candidate_num() + correction_count)
+      return matrix_search->get_candidate_num() + correction_count;
+    if (choice_id > 0 && choice_id <= correction_count) {
+      CorrectionCandidate selected = corrections[choice_id - 1];
+      size_t decoded = 0;
+      strcpy(correction_original, matrix_search->get_pystr(&decoded));
+      correction_count = 0;
+      matrix_search->reset_search();
+      matrix_search->search(selected.spelling, strlen(selected.spelling));
+      size_t count = matrix_search->get_candidate_num();
+      for (size_t i = 0; i < count; i++) {
+        char16 text[kMaxSearchSteps];
+        if (matrix_search->get_candidate(i, text, kMaxSearchSteps) &&
+            utf16_strcmp(text, selected.text) == 0)
+          return matrix_search->choose(i);
+      }
+      // If a suggestion cannot be selected, restore the original composition.
+      matrix_search->reset_search();
+      matrix_search->search(correction_original, strlen(correction_original));
+      correction_original[0] = '\0';
+      return refresh_corrections();
+    }
+    if (choice_id > correction_count) choice_id -= correction_count;
+    correction_count = 0;
+    correction_original[0] = '\0';
     return matrix_search->choose(choice_id);
   }
 
@@ -139,7 +198,15 @@ extern "C" {
     if (NULL == matrix_search)
       return 0;
 
-    return matrix_search->cancel_last_choice();
+    correction_count = 0;
+    if (correction_original[0]) {
+      matrix_search->reset_search();
+      matrix_search->search(correction_original, strlen(correction_original));
+      correction_original[0] = '\0';
+    } else {
+      matrix_search->cancel_last_choice();
+    }
+    return refresh_corrections();
   }
 
   size_t im_get_fixed_len() {
