@@ -1398,6 +1398,7 @@ size_t MatrixSearch::get_spl_start(const uint16 *&spl_start) {
 }
 
 size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
+  lpi_total_ = 0;
   if (dmi_pool_used_ >= kDmiPoolSize) return 0;
 
   if (dmi_c_phrase_)
@@ -1413,9 +1414,6 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
   // 1. If this is a half Id, get its corresponding full starting Id and
   // number of full Id.
   size_t ret_val = 0;
-  PoolPosType mtrx_dmi_fr = (PoolPosType)-1;  // From which dmi node
-
-  lpi_total_ = 0;
 
   MileStoneHandle from_h[3];
   from_h[0] = 0;
@@ -1436,11 +1434,6 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
   }
   if (handles[0] > 0)
     lpi_total_ = lpi_num;
-
-  if (NULL == dmi_s) {  // from root
-    assert(0 != handles[0]);
-    mtrx_dmi_fr = dmi_pool_used_;
-  }
 
   // 3. Begin extending in the user dictionary
   if (NULL != user_dict_ && (from_h[1] > 0 || NULL == dmi_s)) {
@@ -1477,6 +1470,9 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
     }
 
     ret_val = 1;
+  } else {
+    // Cached candidates cannot refer to a match node that was never created.
+    return 0;
   }
 
   if (!cached) {
@@ -1702,7 +1698,7 @@ size_t MatrixSearch::get_lpis(const uint16* splid_str, size_t splid_str_len,
     LmaPsbStrItem *lpsis = reinterpret_cast<LmaPsbStrItem*>(lma_buf + num);
     size_t lpsi_num = (max_lma_buf - num) * sizeof(LmaPsbItem) /
         sizeof(LmaPsbStrItem);
-    assert(lpsi_num > num);
+    // Initial-letter queries can exceed the available deduplication space.
     if (num > lpsi_num) num = lpsi_num;
     lpsi_num = num;
 

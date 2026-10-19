@@ -495,9 +495,8 @@ MileStoneHandle DictTrie::extend_dict1(MileStoneHandle from_handle,
                 mile_stones_[mile_stones_pos_].mark_start =
                   parsing_marks_pos_;
               parsing_marks_pos_++;
+              ret_val++;
             }
-
-            ret_val++;
           }
           break;
         }  // for son_pos
@@ -573,9 +572,8 @@ MileStoneHandle DictTrie::extend_dict2(MileStoneHandle from_handle,
                 mile_stones_[mile_stones_pos_].mark_start =
                   parsing_marks_pos_;
               parsing_marks_pos_++;
+              ret_val++;
             }
-
-            ret_val++;
           }
           break;
         }
